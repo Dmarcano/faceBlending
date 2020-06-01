@@ -1,0 +1,8 @@
+numpy = "*"
+matplotlib = "*"
+pandas = "*"
+opencv-contrib-python = "*"
+jupyter = "*"
+torch = "*"
+torchvision = "*"
+flask = "*"
