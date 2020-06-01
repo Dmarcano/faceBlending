@@ -1,0 +1,19 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[dev-packages]
+
+[packages]
+numpy = "*"
+matplotlib = "*"
+pandas = "*"
+opencv-contrib-python = "*"
+jupyter = "*"
+Flask = "*"
+requests = "*"
+pyinstaller = "*"
+
+[requires]
+python_version = "3.7"
