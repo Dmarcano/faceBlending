@@ -14,6 +14,7 @@ jupyter = "*"
 Flask = "*"
 requests = "*"
 pyinstaller = "*"
+dlib = "*"
 
 [requires]
 python_version = "3.7"

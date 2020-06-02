@@ -87,11 +87,12 @@ def _test():
     img = cv2.resize(img, (w//4, h//4))
     if not isinstance(img, np.ndarray):
         raise Exception("Failed to load image!")
-    features = ['eyes']
-
+    features = ['eyes', 'face']
+    result = []
     for feature in features:
-        result = detect_features(img, feature)
-        draw_bounding_boxes(img, result)
+        detected = detect_features(img, feature)
+        result.extend(detected)
+    draw_bounding_boxes(img, result)
     
     cv2.imshow("test", img)
     cv2.waitKey()
