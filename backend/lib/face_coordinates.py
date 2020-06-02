@@ -1,6 +1,8 @@
 """
 This module allows you to get the coordinates of a face and its features
-in an image using simple face detection found in open CV
+in an image using Open CV and Dlib 
+
+credits for the helper function from img utils
 
 """
 import cv2
@@ -8,13 +10,9 @@ import numpy as np
 from os import chdir, listdir
 from os.path import abspath, isfile, join, dirname
 from glob import glob 
+import dlib
 
-SUPPORTED_FEATURES = {  "eyes" : "haarcascade_eye_tree_eyeglasses.xml", 
-                        'left_eye' : 'haarcascade_lefteye_2splits.xml', 
-                        'right_eye': "", 
-                        'smile' : "", 
-                        "face" : "haarcascade_frontalface_alt.xml",
-                        "face_profile": "haarcascade_profileface.xml"}
+
 
 def __get_haar_cascade_classifier(xml_weights_name :str ="haarcascade_frontalface_alt.xml" ):
     """
@@ -32,8 +30,47 @@ def __get_haar_cascade_classifier(xml_weights_name :str ="haarcascade_frontalfac
     hits = list(filter(lambda path :xml_weights_name  in path, xml_files))
     # grab the first xml cascade classifier weights
     classifier = cv2.CascadeClassifier(hits[0])
-
     return classifier
+
+def __get_facial_feature_detector():
+    dname = dirname(__file__)
+    xml_files = glob(f'{dname}/xmlWeights/*.dat')
+    filename = 'shape_predictor_68_face_landmarks'
+
+    if len(xml_files) == 0:
+        raise FileNotFoundError("Failed to find XML weights for face detection inside xmlWeights folder")
+
+    hits = list(filter(lambda path :filename  in path, xml_files))
+    
+    
+    detector = dlib.shape_predictor(hits[0])
+
+    return detector
+
+def rect_to_bb(rect):
+	# take a bounding predicted by dlib and convert it
+	# to the format (x, y, w, h) as we would normally do
+	# with OpenCV
+	x = rect.left()
+	y = rect.top()
+	w = rect.right() - x
+	h = rect.bottom() - y
+
+	# return a tuple of (x, y, w, h)
+	return (x, y, w, h)
+
+
+def shape_to_np(shape, dtype="int"):
+	# initialize the list of (x, y)-coordinates
+	coords = np.zeros((68, 2), dtype=dtype)
+	# loop over the 68 facial landmarks and convert them
+	# to a 2-tuple of (x, y)-coordinates
+	for i in range(0, 68):
+		coords[i] = (shape.part(i).x, shape.part(i).y)
+	# return the list of (x, y)-coordinates
+	return coords
+
+
 
 def detect_face_coordinates(img : np.ndarray, face_detector = None):
     """
@@ -63,46 +100,69 @@ def draw_bounding_boxes(img, coordinates_list):
 
     return img
 
-def detect_features(img : np.ndarray, feature : str):
+def draw_facial_features(img, feature_coords):
     """
-    Function which detects specific facial features
+    Draws the 68 feature points 
+    """
+
+    for (x,y) in feature_coords:
+       cv2.circle(img, (x,y), 1, (0,0,255), -1)
+
+
+    return img 
+
+def detect_features(img : np.ndarray):
+    """
+    Function which detects all facial pictures of a single person in the picture.
+    
+    For more than one person use detect_features_many()
 
     img : numpy.ndarray -> image to detect the features in 
-
-    feature : string -> a feature for which to look for. must be either ('eyes', 'face')
-    
     """
-
-    if feature not in SUPPORTED_FEATURES:
-        raise NotImplementedError(f'specified feature is not implemented!\nthe only implemented keywords are {SUPPORTED_FEATURES}')
-    classifier = __get_haar_cascade_classifier(xml_weights_name= SUPPORTED_FEATURES[feature] )
+    # get the detector 
+    detector = dlib.get_frontal_face_detector()
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    features = classifier.detectMultiScale(gray, 1.1, 4)
+    rects = detector(gray, 1)
 
-    return features
+    predictor = __get_facial_feature_detector()
+
+
+    people = []
+    for rect in rects:
+        shape = predictor(gray, rect)
+        shape = shape_to_np(shape)
+        bounding_rect = rect_to_bb(rect)
+        person = (bounding_rect, shape)
+        
+        return person 
+        
+
+
 
 def _test():
-    img = cv2.imread('../../images/obama.jpg')
+    img = cv2.imread('../../images/monster.png')
     h,w, _ = img.shape
-    img = cv2.resize(img, (w//4, h//4))
+    # img = cv2.resize(img, (w//4, h//4))
     if not isinstance(img, np.ndarray):
         raise Exception("Failed to load image!")
-    features = ['eyes', 'face']
-    result = []
-    for feature in features:
-        detected = detect_features(img, feature)
-        result.extend(detected)
-    draw_bounding_boxes(img, result)
+    # give us a person with a bounding rectangle for 0 idx and 68 face features for idx 1
+    person = detect_features(img)
+    
+    img = draw_bounding_boxes(img, [person[0]])
+    img = draw_facial_features(img, person[1])
     
     cv2.imshow("test", img)
     cv2.waitKey()
 
     return 
 
+
+
+
+
 if __name__ == "__main__":
     # Change working directory to file directory for debbugging
     abspath = abspath(__file__)
     dname = dirname(abspath)
     chdir(dname)
-
     _test()
