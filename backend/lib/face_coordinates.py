@@ -12,7 +12,13 @@ from os.path import abspath, isfile, join, dirname
 from glob import glob 
 import dlib
 
-
+class FaceNotFoundError(Exception):
+    """
+    Custom exception when a face cannot be found
+    """
+    def __init__(self, message):
+        self.message = message
+        super().__init__(self.message)
 
 def __get_haar_cascade_classifier(xml_weights_name :str ="haarcascade_frontalface_alt.xml" ):
     """
@@ -38,7 +44,7 @@ def __get_facial_feature_detector():
     filename = 'shape_predictor_68_face_landmarks'
 
     if len(xml_files) == 0:
-        raise FileNotFoundError("Failed to find XML weights for face detection inside xmlWeights folder")
+        raise FileNotFoundError("Failed to find dlib dat weights for face detection inside xmlWeights folder")
 
     hits = list(filter(lambda path :filename  in path, xml_files))
     
@@ -106,23 +112,31 @@ def draw_facial_features(img, feature_coords):
     """
 
     for (x,y) in feature_coords:
-       cv2.circle(img, (x,y), 1, (0,0,255), -1)
+       cv2.circle(img, (x,y), 5, (0,0,255), -1)
 
 
     return img 
 
-def detect_features(img : np.ndarray):
+def detect_features(img : np.ndarray) -> tuple:
     """
     Function which detects all facial pictures of a single person in the picture.
     
     For more than one person use detect_features_many()
 
     img : numpy.ndarray -> image to detect the features in 
+
+    returns: a tuple (rect, points) where:
+        rect is a tuple of x,y,w,h parameters for the bounding box of the face 
+
+         points is a 68 numpy ndarray of facial landmarks
     """
     # get the detector 
     detector = dlib.get_frontal_face_detector()
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     rects = detector(gray, 1)
+
+    if len(rects) == 0:
+        raise FaceNotFoundError("Failed to locate a face in the given image!")
 
     predictor = __get_facial_feature_detector()
 
@@ -142,11 +156,14 @@ def detect_features(img : np.ndarray):
 def _test():
     img = cv2.imread('../../images/monster.png')
     h,w, _ = img.shape
+
+    img2 = np.zeros_like(img)
     # img = cv2.resize(img, (w//4, h//4))
     if not isinstance(img, np.ndarray):
         raise Exception("Failed to load image!")
     # give us a person with a bounding rectangle for 0 idx and 68 face features for idx 1
     person = detect_features(img)
+    person2 = detect_features(img2)
     
     img = draw_bounding_boxes(img, [person[0]])
     img = draw_facial_features(img, person[1])
