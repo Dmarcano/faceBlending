@@ -40,13 +40,61 @@ class FaceBlendingModel():
         except FaceNotFoundError:
             print('There was a problem finding a face! try another photo')
 
+    def draw_feature(self, *features, img =None):
+        """
+        function which draws a facial feature overtop an image. The default option is to create a blank image mask of the feature
+
+        The supported features are those features for facial landmark detection and full_face for all features at once
+
+        """
+
+        if isinstance(img, type(None)):
+            raise Exception("please provide an image")
+
+        feature_list = self._feature_dict.keys() if "full_face" in features else [feature for feature in features]
+
+        for face_feature in feature_list:
+            # checks if the passed feature is part of the supported feature
+            if face_feature not in self._feature_dict:
+                raise Exception(f"Please provide one of the following features:\n {self._feature_dict.keys()} or provide 'full_face'")
+
+            if face_feature == 'jaw':
+                pass 
+
+            else:
+                coords = self._feature_dict[face_feature]
+                hull = cv2.convexHull(coords)
+                cv2.convexHull(img, [hull], -1, (255,255,255))        
+
+        return img
+
     def resize(self, img, width):
+        """
+        resises the image to a specific width while mainting the aspect ratio of the picture
+        """
         img_h, img_w, _ = img.shape
         ratio = width/img_w
         dim = (width, int(img_h * ratio))
         return cv2.resize(img, dim)
 
-    def draw_feature(self, feature):
+    def extend(self, height):
+        """
+        returns an extended version of the base image.
+        Adds more blank rows on the bottom of the image to reach a specific height
+        """
+
+        return
+
+    def crop(self, height):
+        """
+        returns a cropped version of the base image such that 
+        """
+        return 
+
+    def draw_feature_points(self, feature):
+        """
+        draws points for facial features
+        """
         if feature not in self._feature_dict:
             raise Exception('must use the following features: ')
         
@@ -54,11 +102,6 @@ class FaceBlendingModel():
         facial_coordinates = self._feature_dict[feature]
         return draw_facial_features(copy,facial_coordinates)
              
-    
-    def test(self, img):
-        
-        print(f"this is a test! face is {self.face_found}")
-
 
 def alpha_blend(A, B, alpha):
     # 
@@ -100,6 +143,38 @@ def pyr_build(img):
 
     return lap_pyr 
 
+def pyr_reconstruct(lap_pyramid):
+    """
+    Given a laplacian pyramid. Rebuilds the base image from it
+    """
+
+    laplacians = lap_pyramid.copy()
+    reconstruct_list = [laplacians.pop()]
+    # reverse the list so everything goes from 0 to size
+    laplacians.reverse()
+    num_levels = len(laplacians)
+
+    for i in range(num_levels):
+        current_r = reconstruct_list[i]
+        # next Ri = curr Ri upscaled + next Laplacian  
+        next_laplacian = laplacians[i]
+        h,w = next_laplacian.shape[:2]
+        # upscale current r and add the next laplacian to it
+        pyrup = cv2.pyrUp(current_r, dstsize=(w,h))
+        next_r =  pyrup + next_laplacian
+        reconstruct_list.append(next_r)
+
+    to_return = reconstruct_list.pop()
+    # to_return = to_return - np.amin(to_return)
+    to_return = (to_return / np.abs(to_return).max())
+    
+    #cv2.imshow('rebuild as float', (to_return / np.abs(to_return).max()))
+    to_return = np.clip(to_return, 0, 1)
+    to_return = to_return*255
+    to_return = to_return.astype(np.uint8)
+
+    return to_return
+
 def test():
     path = "../../images/obama.jpg"
     img = cv2.imread(path)
@@ -107,10 +182,12 @@ def test():
 
     face_model = FaceBlendingModel(img)
     
-    for feature in face_model._feature_dict.keys():
-        img = face_model.draw_feature(feature)
-        cv2.imshow('test', img)
-        cv2.waitKey()
+    to_show = face_model.draw_feature("left_eye", "right_eye", img = np.zeros_like(face_model.img))
+    img = face_model.draw_feature('left_eye', 'right_eye', img= face_model.img)
+
+    cv2.imshow("shit" , to_show)
+
+    cv2.imshow('sorry', img)
 
     return 
 
