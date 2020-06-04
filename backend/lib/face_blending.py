@@ -12,9 +12,9 @@ class FaceBlendingModel():
     A container for an image, and all of its facial features. 
     """
 
-    def __init__(self, img):
+    def __init__(self, img, width = 720):
         self.face_found = False 
-        self.img = self.resize(img,720) 
+        self.img = self.resize(img,width) 
         try:
             self.bounding_rect, landmark_points = detect_features(self.img)
             self.jaw = landmark_points[0:16]
@@ -42,7 +42,7 @@ class FaceBlendingModel():
 
     def draw_feature(self, *features, img =None):
         """
-        function which draws a facial feature overtop an image. The default option is to create a blank image mask of the feature
+        function which draws a facial feature overtop an image. 
 
         The supported features are those features for facial landmark detection and full_face for all features at once
 
@@ -64,7 +64,8 @@ class FaceBlendingModel():
             else:
                 coords = self._feature_dict[face_feature]
                 hull = cv2.convexHull(coords)
-                cv2.convexHull(img, [hull], -1, (255,255,255))        
+                cv2.drawContours(img, [hull], -1, (255,255,255), -1)  
+                      
 
         return img
 
@@ -82,7 +83,10 @@ class FaceBlendingModel():
         returns an extended version of the base image.
         Adds more blank rows on the bottom of the image to reach a specific height
         """
-
+        h, w, _ = self.img.shape 
+        rows = np.array([np.zeros((500,3)) for row in range(height) ])
+        extended_copy = np.vstack((self.img.copy(), rows))
+        print(extended_copy.shape)
         return
 
     def crop(self, height):
@@ -175,19 +179,47 @@ def pyr_reconstruct(lap_pyramid):
 
     return to_return
 
-def test():
-    path = "../../images/obama.jpg"
+
+def extend_test():
+    path = "../../images/monster.png"
     img = cv2.imread(path)
     zero = np.zeros_like(img)
 
-    face_model = FaceBlendingModel(img)
+    face_model = FaceBlendingModel(img, width= 500)
+    face_model.extend(10)
+
+    return
+
+def facial_points_test():
+    path = "../../images/monster.png"
+    img = cv2.imread(path)
+    zero = np.zeros_like(img)
+
+    face_model = FaceBlendingModel(img, width= 500)
+
+    for feature in face_model._feature_dict.keys():
+        img = face_model.draw_feature_points(feature)
+        cv2.imshow('test', img)
+        cv2.waitKey()
+
+    return
+
+def test():
+    path = "../../images/monster.png"
+    img = cv2.imread(path)
+    zero = np.zeros_like(img)
+
+    face_model = FaceBlendingModel(img, width= 500)
     
-    to_show = face_model.draw_feature("left_eye", "right_eye", img = np.zeros_like(face_model.img))
-    img = face_model.draw_feature('left_eye', 'right_eye', img= face_model.img)
+    to_show = face_model.draw_feature("full_face" , img = np.zeros_like(face_model.img))
+    second = face_model.draw_feature("left_eye", 'mouth' , img = face_model.img.copy())
+    img = face_model.draw_feature('full_face', img= face_model.img.copy())
 
     cv2.imshow("shit" , to_show)
+    cv2.imshow("second" , second)
 
     cv2.imshow('sorry', img)
+    cv2.waitKey()
 
     return 
 
@@ -197,6 +229,6 @@ if __name__ == "__main__":
     abspath = os.path.abspath(__file__)
     dname = os.path.dirname(abspath)
     os.chdir(dname)
-
-    test()
+    # facial_points_test()
+    extend_test()
     
