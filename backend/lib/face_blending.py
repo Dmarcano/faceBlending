@@ -3,6 +3,7 @@ This module implements a model and mechanism for easily blending parts of differ
 
 """
 from face_coordinates import detect_features, draw_bounding_boxes, draw_facial_features, FaceNotFoundError
+from image_blending import combine_images_pyramid, DimensionMisMatchException
 import numpy as np 
 import cv2 
 
@@ -40,7 +41,7 @@ class FaceBlendingModel():
         except FaceNotFoundError:
             print('There was a problem finding a face! try another photo')
 
-    def draw_feature(self, *features, img =None):
+    def draw_feature(self, *features, img =None, dtype = np.uint8):
         """
         function which draws a facial feature overtop an image. 
 
@@ -53,6 +54,11 @@ class FaceBlendingModel():
 
         feature_list = self._feature_dict.keys() if "full_face" in features else [feature for feature in features]
 
+        pixel_intensity = {
+            np.uint8 :  (255,255,255),
+            np.float32 : (1,1,1)
+        }
+
         for face_feature in feature_list:
             # checks if the passed feature is part of the supported feature
             if face_feature not in self._feature_dict:
@@ -64,7 +70,7 @@ class FaceBlendingModel():
             else:
                 coords = self._feature_dict[face_feature]
                 hull = cv2.convexHull(coords)
-                cv2.drawContours(img, [hull], -1, (255,255,255), -1)  
+                cv2.drawContours(img, [hull], -1, pixel_intensity[dtype], -1)  
                       
 
         return img
@@ -99,30 +105,79 @@ class FaceBlendingModel():
         """
         return 
 
-    def draw_feature_points(self, feature):
+    def draw_feature_points(self, feature, dtype = np.uint8):
         """
         draws points for facial features
         """
         if feature not in self._feature_dict:
             raise Exception('must use the following features: ')
         
-        copy = self.img.copy()
+        copy = self.img.astype(dtype = dtype)
         facial_coordinates = self._feature_dict[feature]
         return draw_facial_features(copy,facial_coordinates)
              
 
-def blend_face_models(src_face, dest_face, *features):
+def blend_face_models(src_face_model, dst_face_model, *features):
     """
-    given two face models and a set of features 
+    given two face models and a set of features to blend, then creates an output image which is the blended 
     """
+    src_h, src_w, _ = src_face_model.img.shape
+    dst_h, dst_w, _ = dst_face_model.img.shape
+    # make sure the widths of the models match 
+    if src_w != dst_w:
+        raise DimensionMisMatchException(f"Source model image width of {src_w} does not match destination model image width of {dst_w}")
+    if len(features) == 0:
+        raise Exception("No features given to function")
+    
+    destination_extended = False 
+    # make sure that the heights of the models match 
+    if src_h > dst_h:
+        difference = src_h - dst_h
+        src_img = src_face_model.img.copy()
+        dst_img = dst_face_model.extend(difference)
+        destination_extended = True 
+
+    elif src_h <dst_h:
+        difference =  dst_h - src_h
+        src_img = src_face_model.img.extend(difference)
+        dst_img = dst_face_model.copy()
+        
+    else:
+        src_img = src_face_model.img.copy()
+        dst_img = dst_face_model.copy()
+
+    mask = src_face_model.draw_feature(*features, img =np.zeros((src_h, src_w, _),dtype=np.float32), dtype=np.float32)
+    
+    blended_img = combine_images_pyramid(src_img = src_img, dst_img= dst_img, mask = mask, num_levels=8)
+
+    if destination_extended:
+        blended_img = blended_img[0 : dst_h, : ]
+
+    return blended_img
+
+
+def __align_face_models(src_face_model, dst_face_model):
+    """
+    returns an aligned version of the 
+    """
+
 
     return 
 
 
-def blend_faces(src_face, dest_face, width, *features, **meta_data):
+def blend_faces(src_face, dst_face, width, *features, **meta_data):
 
+    if len(features) == 0:
+        raise Exception("No features given to function")
 
-    return 
+    src_model = FaceBlendingModel(src_face, width = width)
+    dst_model = FaceBlendingModel(dst_face, width = width)
+
+    combined_img = blend_face_models(src_model, dst_model, *features)
+    
+    
+
+    return combined_img
 
 
 def extend_test():
@@ -136,6 +191,23 @@ def extend_test():
     face_model.draw_feature("full_face", img = img)
 
     cv2.imshow('shh', img )
+    cv2.waitKey()
+
+
+    return
+
+def face_blend_test_full_features():
+    path1 = "../../images/obama.jpg"
+    path2 = "../../images/tyson.jpg"
+
+    img1 = cv2.imread(path1)
+    img2 = cv2.imread(path2)
+    tyson_model = FaceBlendingModel(img1, width=500)
+    img_cutout = tyson_model.draw_feature('full_face', img= tyson_model.img.copy())
+    combined_img = blend_faces(img1, img2, 500, "full_face")
+
+    cv2.imshow("result", combined_img)
+    cv2.imshow("sorry mom", img_cutout)
     cv2.waitKey()
 
 
@@ -155,8 +227,10 @@ def facial_points_test():
 
     return
 
+
+
 def test():
-    path = "../../images/monster.png"
+    path = "../../images/tyson.jpg"
     img = cv2.imread(path)
     zero = np.zeros_like(img)
 
@@ -181,5 +255,7 @@ if __name__ == "__main__":
     dname = os.path.dirname(abspath)
     os.chdir(dname)
     # facial_points_test()
-    extend_test()
+    # extend_test()
+    # test()
+    face_blend_test_full_features()
     

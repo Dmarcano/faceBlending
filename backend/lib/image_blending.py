@@ -114,14 +114,14 @@ def alpha_blend(A, B, alpha):
     A = A.astype(alpha.dtype)
     B = B.astype(alpha.dtype)
     # if A and B are RGB images, we must pad# out alpha to be the right shape
-    if len(A.shape) == 3:
-        alpha = np.expand_dims(alpha, 2)
+    # if len(A.shape) == 3:
+    #     alpha = np.expand_dims(alpha, 2)
         
-        return A + alpha*(B-A)
+    return A + alpha*(B-A)
 
 
 
-def combine_images_pyramid(image1, image2, mask, num_levels, copy = False):
+def combine_images_pyramid(src_img, dst_img, mask, num_levels, copy = False):
     """
     given two images and an alpha mask,
     it blends the two images along an arbitrary mask given
@@ -129,10 +129,11 @@ def combine_images_pyramid(image1, image2, mask, num_levels, copy = False):
     Requires that the dimensions of the 
     """
 
-    if image1.shape != image2.shape:
-        raise DimensionMisMatchException(f"Picture Dimensions of image1 : {image1.shape} and  image2: {image2.shape} do not match")
+    if src_img.shape != dst_img.shape:
+        raise DimensionMisMatchException(f"Picture Dimensions of src_img : {src_img.shape} and  dst_img: {dst_img.shape} do not match")
 
-    img1,img2 = image1.copy(), image2.copy() if copy else image1, image2
+    img1 = src_img.copy() if copy else src_img
+    img2 = dst_img.copy() if copy else dst_img
 
     # get the laplacian pyramids of each image
     img1_lap_pyr = pyr_build(img1, num_levels)
@@ -147,7 +148,7 @@ def combine_images_pyramid(image1, image2, mask, num_levels, copy = False):
         h,w = img1_lap_pyr[i].shape[:2]
         resized_alpha = cv2.resize(mask, (w,h), interpolation=cv2.INTER_AREA)
         # blend and append to new pyramid
-        mixed_pyr_level = alpha_blend(img1_lap_pyr[i], img2_lap_pyr[i], resized_alpha)
+        mixed_pyr_level = alpha_blend(img2_lap_pyr[i],img1_lap_pyr[i], resized_alpha)
 
         mixed_pyramid.append(mixed_pyr_level)
 
