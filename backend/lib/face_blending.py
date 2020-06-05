@@ -15,16 +15,17 @@ class FaceBlendingModel():
 
     def __init__(self, img, width = 720):
         self.face_found = False 
-        self.img = self.resize(img,width) 
+        self.img : np.ndarray = self.resize(img,width) 
         try:
-            self.bounding_rect, landmark_points = detect_features(self.img)
-            self.jaw = landmark_points[0:16]
-            self.left_eyebrow = landmark_points[17:21]
-            self.right_eyebrow = landmark_points[22:26]
-            self.nose = landmark_points[27:35]
-            self.left_eye = landmark_points[36:41]
-            self.right_eye = landmark_points[42:47]
-            self.mouth = landmark_points[48:67]
+            bounding_rect, landmark_points = detect_features(self.img)
+            self.bounding_rect = bounding_rect
+            self.jaw = landmark_points[0:17]
+            self.left_eyebrow = landmark_points[17:22]
+            self.right_eyebrow = landmark_points[22:27]
+            self.nose = landmark_points[27:36]
+            self.left_eye = landmark_points[36:42]
+            self.right_eye = landmark_points[42:48]
+            self.mouth = landmark_points[48:68]
 
             self._feature_dict = {
                 'jaw' : self.jaw,
@@ -96,7 +97,6 @@ class FaceBlendingModel():
         h, w, _ = self.img.shape 
         rows = np.array([np.zeros((500,3), dtype=dtype) for row in range(num_rows) ])
         extended_copy = np.vstack((self.img.copy(), rows))
-        print(extended_copy.shape)
         return extended_copy
 
     def crop(self, height):
@@ -115,12 +115,45 @@ class FaceBlendingModel():
         copy = self.img.astype(dtype = dtype)
         facial_coordinates = self._feature_dict[feature]
         return draw_facial_features(copy,facial_coordinates)
-             
+    
+    def get_facial_feature_array(self):
+        """
+        returns an ndarray with all 68 points from the dlib facial landmark detection algorithm
+        """
+        to_return = np.concatenate( [arr for arr in self._feature_dict.values()] )
 
-def blend_face_models(src_face_model, dst_face_model, *features):
+        return to_return
+
+    def get_face_bounding_box(self, dtype = np.int32):
+        """
+        Gets an np array with the face bounding box that was found by the dlib face detection module
+
+        it has three points that correspond to the top-left, top-right, bottom-right points of the bounding box
+        """
+        x,y,w,h = self.bounding_rect
+        return np.array([ [x,y], [x + w, y], [x + w, y + h] ] , dtype=dtype  )
+
+    def get_all_face_points(self):
+        """
+        Gets one array with both the bounding box points and facial landmark points
+        """
+        return np.concatenate((self.get_face_bounding_box(), self.get_facial_feature_array()))
+
+    def get_all_facial_feature_labels(self):
+        """
+        returns a list of all the feature labels that are used for face detection
+        """
+        return list(self._feature_dict.keys())
+
+
+
+def blend_face_models(src_face_model : FaceBlendingModel, dst_face_model : FaceBlendingModel, *features):
     """
     given two face models and a set of features to blend, then creates an output image which is the blended 
     """
+    assert isinstance(src_face_model, FaceBlendingModel)
+    assert isinstance(dst_face_model, FaceBlendingModel)
+
     src_h, src_w, _ = src_face_model.img.shape
     dst_h, dst_w, _ = dst_face_model.img.shape
     # make sure the widths of the models match 
@@ -128,6 +161,8 @@ def blend_face_models(src_face_model, dst_face_model, *features):
         raise DimensionMisMatchException(f"Source model image width of {src_w} does not match destination model image width of {dst_w}")
     if len(features) == 0:
         raise Exception("No features given to function")
+
+    __align_face_models(src_face_model, dst_face_model)
     
     destination_extended = False 
     # make sure that the heights of the models match 
@@ -156,12 +191,18 @@ def blend_face_models(src_face_model, dst_face_model, *features):
     return blended_img
 
 
-def __align_face_models(src_face_model, dst_face_model):
+def __align_face_models(src_face_model : FaceBlendingModel, dst_face_model : FaceBlendingModel):
     """
     returns an aligned version of the 
     """
+    assert isinstance(src_face_model, FaceBlendingModel)
+    assert isinstance(dst_face_model,FaceBlendingModel)
+    # need to get the affine transform from the source image to the destination image, this can be done by using the bounding box points and 
+    # face feature points 
 
-
+    src_points = src_face_model.get_all_face_points()
+    dst_points = dst_face_model.get_all_face_points()
+    
     return 
 
 
