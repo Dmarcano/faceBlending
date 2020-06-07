@@ -180,26 +180,42 @@ def blend_face_models(src_face_model : FaceBlendingModel, dst_face_model : FaceB
         raise Exception("No features given to function")
 
     # align the source image to fit the features of the destination for easier blending
-    src_img,mask = __align_face_models(src_face_model, dst_face_model, features)
+    # src_img,mask = __align_face_models(src_face_model, dst_face_model, features)
+
+    src_points = src_face_model.get_face_bounding_box()
+    dst_points = dst_face_model.get_face_bounding_box()
+
+    # this is the rotation, zoom, and translation matrix such that the points from image 2 match up the points of image 1. This lines up the faces 
+    transform_src_to_dst = cv2.getAffineTransform(src_points.astype(np.float32), dst_points.astype(np.float32))
+    # transform_src_to_dst = cv2.getAffineTransform(src, dst)
+    # next we perform the scale, zoom, and translation of the src image such that it lines up with the destination image
+   
     
     destination_extended = False 
     # make sure that the heights of the models match 
     if src_h > dst_h:
         difference = src_h - dst_h
         dst_img = dst_face_model.extend(difference)
+        src_img = src_face_model.img.copy()
         destination_extended = True 
 
     elif src_h <dst_h:
         difference =  dst_h - src_h
-        src_img = extend_img(difference,src_img)
+        src_img = extend_img(difference, src_face_model.img.copy())
         dst_img = dst_face_model.img.copy()
         
     else:
         dst_img = dst_face_model.img.copy()
+        src_img = src_face_model.img.copy()
+
+    image_transform = cv2.warpAffine(src_img, transform_src_to_dst, (dst_face_model.img.shape[1], dst_face_model.img.shape[0]), borderMode=cv2.BORDER_REPLICATE)
+    mask = src_face_model.draw_feature(*features, img =np.zeros((dst_face_model.img.shape[1], dst_face_model.img.shape[0], 3),dtype=np.float32), dtype=np.float32)
+
+    mask = cv2.warpAffine(mask, transform_src_to_dst, (dst_face_model.img.shape[1], dst_face_model.img.shape[0]), borderMode=cv2.BORDER_REPLICATE)
 
     # mask = src_face_model.draw_feature(*features, img =np.zeros((src_h, src_w, _),dtype=np.float32), dtype=np.float32)
     
-    blended_img = combine_images_pyramid(src_img = src_img, dst_img= dst_img, mask = mask, num_levels=8)
+    blended_img = combine_images_pyramid(src_img = image_transform, dst_img= dst_img, mask = mask, num_levels=8)
 
     if destination_extended:
         blended_img = blended_img[0 : dst_h, : ]
@@ -213,31 +229,19 @@ def __align_face_models(src_face_model : FaceBlendingModel, dst_face_model : Fac
     """
     assert isinstance(src_face_model, FaceBlendingModel)
     assert isinstance(dst_face_model,FaceBlendingModel)
-    # need to get the affine transform from the source image to the destination image, this can be done by using the bounding box points and 
-    # face feature points 
-
-    # if "full_face" in features:
-    #     src_points = src_face_model.get_all_face_points()
-    #     dst_points = dst_face_model.get_all_face_points()
-
-    # else:
-    #     src_points = src_face_model.get_facial_feature_array(features)
-    #     dst_points = dst_face_model.get_facial_feature_array(features)
 
     src_points = src_face_model.get_face_bounding_box()
     dst_points = dst_face_model.get_face_bounding_box()
 
-    src = np.array([[50,50],[450,450],[70,420]],np.float32)
-    dst = np.array([[0,0],[299,299],[0,299]],np.float32)
     
     # this is the rotation, zoom, and translation matrix such that the points from image 2 match up the points of image 1. This lines up the faces 
     transform_src_to_dst = cv2.getAffineTransform(src_points.astype(np.float32), dst_points.astype(np.float32))
     # transform_src_to_dst = cv2.getAffineTransform(src, dst)
     # next we perform the scale, zoom, and translation of the src image such that it lines up with the destination image
     image_transform = cv2.warpAffine(src_face_model.img.copy(), transform_src_to_dst, (src_face_model.img.shape[1], src_face_model.img.shape[0]), borderMode=cv2.BORDER_REPLICATE)
-    mask = src_face_model.draw_feature(*features, img =np.zeros((src_face_model.img.shape[0], src_face_model.img.shape[0], 3),dtype=np.float32), dtype=np.float32)
+    mask = src_face_model.draw_feature(*features, img =np.zeros((dst_face_model.img.shape[1], dst_face_model.img.shape[0], 3),dtype=np.float32), dtype=np.float32)
 
-    transformed_mask = cv2.warpAffine(mask, transform_src_to_dst, (src_face_model.img.shape[1], src_face_model.img.shape[0]), borderMode=cv2.BORDER_REPLICATE)
+    transformed_mask = cv2.warpAffine(mask, transform_src_to_dst, (dst_face_model.img.shape[1], dst_face_model.img.shape[0]), borderMode=cv2.BORDER_REPLICATE)
 
 
     return image_transform, transformed_mask 
@@ -281,7 +285,7 @@ def face_blend_test_full_features():
     img1 = cv2.imread(path2)
     img2 = cv2.imread(path1)
     tyson_model = FaceBlendingModel(img1, width=500)
-    img_cutout = tyson_model.draw_feature('full_face', img= tyson_model.img.copy())
+    img_cutout = tyson_model.draw_feature('nose', img= tyson_model.img.copy())
     combined_img = blend_faces(img1, img2, 500, "full_face")
 
     cv2.imshow("result", combined_img)
