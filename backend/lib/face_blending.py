@@ -2,8 +2,8 @@
 This module implements a model and mechanism for easily blending parts of different faces
 
 """
-from face_coordinates import detect_features, draw_bounding_boxes, draw_facial_features, FaceNotFoundError
-from image_blending import combine_images_pyramid, DimensionMisMatchException
+from .face_coordinates import detect_features, draw_bounding_boxes, draw_facial_features, FaceNotFoundError
+from .image_blending import combine_images_pyramid, DimensionMisMatchException
 import numpy as np 
 import cv2 
 
