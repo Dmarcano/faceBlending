@@ -16,6 +16,7 @@ requests = "*"
 pyinstaller = "*"
 dlib = "*"
 cmake = "*"
+pyzmq = "*"
 
 [requires]
 python_version = "3.7"

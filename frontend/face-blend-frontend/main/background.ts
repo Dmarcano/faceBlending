@@ -1,9 +1,8 @@
-import { join } from 'path';
-import { app, ipcMain } from 'electron';
+import { app } from 'electron';
 import serve from 'electron-serve';
 import { createWindow } from './helpers';
 
-const isProd = process.env.NODE_ENV === 'production';
+const isProd: boolean = process.env.NODE_ENV === 'production';
 
 if (isProd) {
   serve({ directory: 'app' });
@@ -30,16 +29,4 @@ if (isProd) {
 
 app.on('window-all-closed', () => {
   app.quit();
-});
-
-ipcMain.on('run-python', (event, arg) => {
-  const spawn = require('cross-spawn');
-  let result;
-  if (process.env.NODE_ENV === 'production') {
-    const executable = join(__dirname, process.platform === 'win32' ? 'hello.exe' : 'hello');
-    result = spawn.sync(executable, [], { encoding: 'utf8' });
-  } else {
-    result = spawn.sync('python', [join(__dirname, '../python/hello.py')], { encoding: 'utf8' });
-  }
-  event.sender.send('result', result.stdout);
 });
