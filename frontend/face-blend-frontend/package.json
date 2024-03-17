@@ -37,7 +37,7 @@
     "apollo-client": "^2.6.3",
     "apollo-link-http": "^1.5.15",
     "electron": "^22.3.25",
-    "electron-builder": "^22.6.1",
+    "electron-builder": "^24.13.3",
     "electron-packager": "^16.0.0",
     "electron-rebuild": "^1.8.5",
     "graphql": "^14.4.2",
